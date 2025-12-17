@@ -45,7 +45,7 @@ def rename_file_regex(path_to_file: str, pattern: str, replace_with: str):
     rename_file(path_to_file=path_to_file, new_name=new_filename)
 
 def replace_with_pattern_regex(path_to_directory: str, pattern: str, replace_with: str):
-    """Replaces substrings in the file name of all filles in the specified
+    """Replaces substrings in the file name of all files in the specified
     directory using REGEX.
 
     Args:
@@ -57,15 +57,32 @@ def replace_with_pattern_regex(path_to_directory: str, pattern: str, replace_wit
     for file in files:
         rename_file_regex(path_to_file=file, pattern=pattern, replace_with=replace_with)
 
+def delete_with_pattern_regex(path_to_directory: str, pattern: str):
+    """Deletes the substring in the file name of all files in the specified
+    Directory using REGEX
+
+    Args:
+        path_to_directory (str): Path to directory
+        pattern (str): Regex pattern
+    """
+    files = get_files(path_to_directory)
+    for file in files:
+        rename_file_regex(path_to_file=file, pattern=pattern, replace_with="")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument('path')
     parser.add_argument('-p', "--pattern-replace",
-                        help=("Use in conjunction with --replace-with."
+                        help=("Use in conjunction with --replace-with or --delete."
                               " REGEX pattern to look for."),
                         default=None)
+    parser.add_argument('-d',
+                        '--delete',
+                        help=("Use in conjunction with --pattern-replace."
+                              " Will delete any matches"),
+                        action="store_true")
     parser.add_argument('-r',
                         '--replace-with',
                         help=("Use in conjunction with --pattern-replace."
@@ -75,6 +92,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
+        # --replace-with
         if args.replace_with is not None:
             print(f"Replace With: {args.replace_with}")
             if args.pattern_replace is not None:
@@ -82,7 +100,17 @@ if __name__ == "__main__":
                 replace_with_pattern_regex(args.path, args.pattern_replace, args.replace_with)
             else:
                 print("--pattern-replace has not been set.")
+
+        # --delete
+        elif args.delete is True:
+            if args.pattern_replace is not None:
+                print(f"REGEX Pattern: {args.pattern_replace}")
+                delete_with_pattern_regex(args.path, args.pattern_replace)
+            else:
+                print("--pattern-replace has not been set.")
+
+        # No option
         else:
-            print("--replace-with has not been set.")
+            print("Option has not been set.")
     except Exception as e:
         print(e)
