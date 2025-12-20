@@ -1,6 +1,7 @@
 """Main an only module for this thing
 """
 import os
+import numbers
 import re
 import argparse
 
@@ -69,6 +70,39 @@ def delete_with_pattern_regex(path_to_directory: str, pattern: str):
     for file in files:
         rename_file_regex(path_to_file=file, pattern=pattern, replace_with="")
 
+def inject_at_position(path_to_directory: str, position: int, string: str):
+    """Injects a string at desired position
+
+    Args:
+        path_to_directory (str): Path to directory
+        position (int): Position to inject string
+        string (str): string
+    """
+    if not isinstance(position, numbers.Number):
+        raise TypeError(f"{position} ain't a number, pal")
+    files = get_files(path_to_directory)
+    for file in files:
+        inject(file, position, string)
+
+def inject(path_to_file: str, position: int, string: str):
+    """Injects a string
+
+    Args:
+        path_to_file (str): Path to desired file.
+        position (int): Position at where to inject string. 0 based.
+        string (str): The actual string to inject.
+    """
+    _, name = os.path.split(path_to_file)
+    # must be 0 or positive to work correctly
+    if position >= 0:
+        name_tmp_1 = name[:position]
+        name_tmp_2 = name[position:]
+        new_name = name_tmp_1 + string + name_tmp_2
+    # for anything else, just default to append at the end
+    else:
+        new_name = name + string
+
+    rename_file(path_to_file, new_name)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -89,11 +123,36 @@ if __name__ == "__main__":
                               " Will search for a pattern and replace it with"
                               " whatever you put here."),
                         default=None)
+    parser.add_argument('-i',
+                        '--inject',
+                        help=("Use in conjunction with --position, --head, --tail"
+                              " (mutually exclusive) and --string. Will inyect"
+                              " a specified string at the defined position"),
+                        action="store_true")
+    parser.add_argument('-n',
+                        '--position',
+                        help=("The position at where to inyect the string, 0 based."
+                              " Exclusive to the right"),
+                        default=None,
+                        type=int)
+    parser.add_argument('-s',
+                        '--string',
+                        help=("The string to inject."),
+                        default=None)
+    parser.add_argument('-e',
+                        '--head',
+                        help=("Place string at the beginning"),
+                        action="store_true")
+    parser.add_argument('-t',
+                        '--tail',
+                        help=("Place string at the end"),
+                        action="store_true")
     args = parser.parse_args()
 
     try:
         # --replace-with
         if args.replace_with is not None:
+            print("Replace Mode")
             print(f"Replace With: {args.replace_with}")
             if args.pattern_replace is not None:
                 print(f"REGEX Pattern: {args.pattern_replace}")
@@ -103,11 +162,30 @@ if __name__ == "__main__":
 
         # --delete
         elif args.delete is True:
+            print("Delete Mode")
             if args.pattern_replace is not None:
                 print(f"REGEX Pattern: {args.pattern_replace}")
                 delete_with_pattern_regex(args.path, args.pattern_replace)
             else:
                 print("--pattern-replace has not been set.")
+
+        # inject
+        elif args.inject is True:
+            print("Inject Mode")
+            if args.string is not None:
+                if args.position is not None:
+                    # inject at position
+                    inject_at_position(args.path, args.position, args.string)
+                elif args.head is True:
+                    # inject at start
+                    inject_at_position(args.path, 0, args.string)
+                elif args.tail is True:
+                    # inject at end
+                    inject_at_position(args.path, -1, args.string)
+                else:
+                    print("No position specified.")
+            else:
+                print("String not specified")
 
         # No option
         else:
