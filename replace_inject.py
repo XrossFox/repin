@@ -6,6 +6,7 @@ import argparse
 
 DRY_RUN = False
 
+
 def get_files(path_to_directory: str) -> list:
     """Returns all files in a directory. Directories will be ommitted.
 
@@ -76,6 +77,38 @@ def delete_with_pattern_regex(path_to_directory: str, pattern: str):
     files = get_files(path_to_directory)
     for file in files:
         rename_file_regex(path_to_file=file, pattern=pattern, replace_with="")
+
+
+def replace_with_sequence(
+    path_to_directory: str, start: int, step: int, stop: int, pattern: str
+):
+    """Delivers a numeric sequence at the desired position of the name of files in a directory.
+
+    Args:
+        path_to_directory (str): Path to directory.
+        position (int): Position of the squence in the name of the file.
+        start (int): Starting number of the sequence.
+        step (int): Amount to increment to the sequence on each iteration
+        stop (int): Stopping number of the sequence (exclusive to the right).
+    """
+    if start < 0 or step < 0 or stop < 0:
+        print(
+            f"Invalid value for start = {start}/step = {step}/stop = {stop}: cannot be less than 0"
+        )
+        return
+
+    files = get_files(path_to_directory)
+    if stop < len(files):
+        print(
+            "Numeric sequence is smaller than count of files in directory. Cannot proceed further."
+        )
+        return
+
+    sequence = iter(range(start, stop, step))
+
+    for file in files:
+        current = next(sequence)
+        rename_file_regex(path_to_file=file, pattern=pattern, replace_with=str(current))
 
 
 def sequence_at_position(
@@ -150,7 +183,7 @@ if __name__ == "__main__":
     parser.add_argument("path")
     parser.add_argument(
         "-p",
-        "--pattern-replace",
+        "--pattern",
         help=(
             "Use in conjunction with --replace-with or --delete."
             " REGEX pattern to look for."
@@ -160,14 +193,24 @@ if __name__ == "__main__":
     parser.add_argument(
         "-d",
         "--delete",
-        help=("Use in conjunction with --pattern-replace." " Will delete any matches"),
+        help=("Use in conjunction with --pattern." " Will delete any matches"),
+        action="store_true",
+    )
+    parser.add_argument(
+        "-j",
+        "--replace-with-sequence",
+        help=(
+            "Use in conjunction with --pattern, --start, --step, --stop."
+            " Will search for a pattern and replace it with"
+            " a number in a sequence."
+        ),
         action="store_true",
     )
     parser.add_argument(
         "-r",
         "--replace-with",
         help=(
-            "Use in conjunction with --pattern-replace."
+            "Use in conjunction with --pattern."
             " Will search for a pattern and replace it with"
             " whatever you put here."
         ),
@@ -179,9 +222,9 @@ if __name__ == "__main__":
         help=(
             "Use in conjunction with --position, --head, --tail"
             " (mutually exclusive) and --string. Will inyect"
-            " a specified string at the defined position"
+            " the specified string at the defined position"
         ),
-        action="store_true",
+        default=None,
     )
     parser.add_argument(
         "-q",
@@ -207,8 +250,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "-u",
         "--start",
-        help=("The starting point of the numeric sequence."
-              " Cannot be less than 0, or less than the count of files"),
+        help=(
+            "The starting point of the numeric sequence."
+            " Cannot be less than 0, or less than the count of files"
+        ),
         default=0,
         type=int,
     )
@@ -229,7 +274,6 @@ if __name__ == "__main__":
         default=0,
         type=int,
     )
-    parser.add_argument("-s", "--string", help=("The string to inject."), default=None)
     parser.add_argument(
         "-e", "--head", help=("Place string at the beginning"), action="store_true"
     )
@@ -237,7 +281,10 @@ if __name__ == "__main__":
         "-t", "--tail", help=("Place string at the end"), action="store_true"
     )
     parser.add_argument(
-        "-a", "--dry-run", help=("Dry run: doesn`t actually rename the files"), action="store_true"
+        "-a",
+        "--dry-run",
+        help=("Dry run: doesn`t actually rename the files"),
+        action="store_true",
     )
     args = parser.parse_args()
 
@@ -250,40 +297,53 @@ if __name__ == "__main__":
         if args.replace_with is not None:
             print("Replace Mode")
             print(f"Replace With: {args.replace_with}")
-            if args.pattern_replace is not None:
-                print(f"REGEX Pattern: {args.pattern_replace}")
+            if args.pattern is not None:
+                print(f"REGEX Pattern: {args.pattern}")
                 replace_with_pattern_regex(
-                    args.path, args.pattern_replace, args.replace_with
+                    args.path, args.pattern, args.replace_with
                 )
             else:
-                print("--pattern-replace has not been set.")
+                print("--pattern has not been set.")
+
+        # --replace-with-sequence
+        elif args.replace_with_sequence:
+            print("Replace with sequence Mode")
+            if args.start > 0 and args.stop > args.start:
+                if args.pattern is not None:
+                    print(f"REGEX Pattern: {args.pattern}")
+                    replace_with_sequence(
+                        args.path, args.start, args.step, args.stop, args.pattern
+                    )
+                else:
+                    print("No pattern specified.")
+            else:
+                print(
+                    f"Start is 0, or less than stop. start:{args.start}, stop:{args.stop}"
+                )
 
         # --delete
         elif args.delete is True:
             print("Delete Mode")
-            if args.pattern_replace is not None:
-                print(f"REGEX Pattern: {args.pattern_replace}")
-                delete_with_pattern_regex(args.path, args.pattern_replace)
+            if args.pattern is not None:
+                print(f"REGEX Pattern: {args.pattern}")
+                delete_with_pattern_regex(args.path, args.pattern)
             else:
-                print("--pattern-replace has not been set.")
+                print("--pattern has not been set.")
 
         # --inject
-        elif args.inject is True:
+        elif args.inject is not None:
             print("Inject Mode")
-            if args.string is not None:
-                if args.position is not None:
-                    # inject at position
-                    inject_at_position(args.path, args.position, args.string)
-                elif args.head is True:
-                    # inject at start
-                    inject_at_position(args.path, 0, args.string)
-                elif args.tail is True:
-                    # inject at end
-                    inject_at_position(args.path, -1, args.string)
-                else:
-                    print("No position specified.")
+            if args.position is not None:
+                # inject at position
+                inject_at_position(args.path, args.position, args.inject)
+            elif args.head is True:
+                # inject at start
+                inject_at_position(args.path, 0, args.inject)
+            elif args.tail is True:
+                # inject at end
+                inject_at_position(args.path, -1, args.inject)
             else:
-                print("String not specified")
+                print("No position specified.")
 
         # --inject-sequence
         elif args.inject_sequence is True:
